@@ -194,7 +194,7 @@ module OData
         end
         it "should return a single primitive type" do
           result = subject.FirstCategoryId
-          result.should be_a Fixnum
+          result.should be_a Integer
           result.should eq 1
         end
       end
@@ -302,6 +302,27 @@ module OData
 
     it "should parse the service without errors" do
       lambda { OData::Service.new "http://test.com/test.svc/", { :username => "xxxx\\yyyy", :password=> "zzzz", :verify_ssl => false, :namespace => "VMM" } }.should_not raise_error
+    end
+  end
+
+  describe "Dual Services" do
+    before(:all) do
+      stub_request(:get, "http://service1.com/test.svc/$metadata").
+      with(:headers => DEFAULT_HEADERS).
+      to_return(:status => 200, :body => File.new(File.expand_path("../fixtures/sample_service/edmx_categories_products.xml", __FILE__)), :headers => {})
+
+      stub_request(:get, "http://service2.com/test.svc/$metadata").
+        with(:headers => DEFAULT_HEADERS).
+        to_return(:status => 200, :body => File.new(File.expand_path("../fixtures/int64_ids/edmx_car_service.xml", __FILE__)), :headers => {})
+
+
+      @service1 = OData::Service.new "http://service1.com/test.svc"
+      @service2 = OData::Service.new "http://service2.com/test.svc"
+    end
+
+    it "should use the correct service uri" do
+      expect(@service1.class_metadata[:uri]).to eq 'http://service1.com/test.svc'
+      expect(@service2.class_metadata[:uri]).to eq 'http://service2.com/test.svc'
     end
   end
 end

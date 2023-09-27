@@ -180,40 +180,60 @@ class Service
     if args.empty?
       #nothing to add
     elsif args.size == 1
-      if args.first.to_s =~ /\d+/
-        id_metadata = find_id_metadata(name.to_s)
-        root << build_id_path(args.first, id_metadata)
-      else
-        root << "(#{args.first})"
-      end
+      keys = get_keys_metadata(name.to_s)
+      root << "(#{build_ids(keys, args.first).join(',')})"
     else
       root << "(#{args.join(',')})"
     end
     QueryBuilder.new(root, additional_parameters)
   end
 
-  # Finds the metadata associated with the given collection's first id property
-  # Remarks: This is used for single item lookup queries using the ID, e.g. Products(1), not complex primary keys
+  # Finds the metadata associated with the given collection's keys
   #
   # @param [String] collection_name the name of the collection
-  def find_id_metadata(collection_name)
+  def get_keys_metadata(collection_name)
     collection_data = @collections.fetch(collection_name)
     class_metadata = @class_metadata.fetch(collection_data[:type].to_s)
-    key = class_metadata.select{|k,h| h.is_key }.collect{|k,h| h.name }[0]
-    class_metadata[key]
+    keys = class_metadata.select{|k,h| h.is_key }
   end
 
   # Builds the ID expression of a given id for query
   #
   # @param [Object] id_value the actual value to be used
   # @param [PropertyMetadata] id_metadata the property metadata object for the id
-  def build_id_path(id_value, id_metadata)
-    if id_metadata.type == "Edm.Int64"
-      "(#{id_value}L)"
+  # Builds the IDs expression for the given ids for query
+  #
+  # @param [Hash] keys Hash of metadata for the keys
+  # @param [Object/Hash] values
+  def build_ids(keys, values)
+    if keys.size == 1
+      [ quote_id(values, keys.first[1]) ]
+    elsif values.is_a?(Hash)
+      ids = []
+      keys.each_pair do |key, meta|
+        v = values[key.to_sym]
+        ids << "#{key}=#{quote_id(v, meta)}"
+      end
+      ids
     else
-      "(#{id_value})"
+      values.to_a
     end
   end
+
+  # Builds the ID expression of a given id for query
+  #
+  # @param [Object] id_value the actual value to be used
+  # @param [PropertyMetadata] id_metadata the property metadata object for the id
+  def quote_id(id_value, id_metadata)
+    if id_metadata.type == "Edm.Int64"
+      "#{id_value}L"
+    elsif id_metadata.type == "Edm.String"
+      "'#{id_value}'"
+    else
+      "#{id_value}"
+    end
+  end
+  
 
   def set_options!(options)
     @options = options
@@ -262,7 +282,8 @@ class Service
   def build_collections_and_classes
     @classes = Hash.new
     @class_metadata = Hash.new # This is used to store property information about a class
-
+    @class_metadata[:uri] = @uri
+    
     # Build complex types first, these will be used for entities
     complex_types = @edmx.xpath("//edm:ComplexType", @ds_namespaces) || []
     complex_types.each do |c|
@@ -794,7 +815,7 @@ class Service
 
   # Parses a value into the proper type based on a specified return type
   def parse_primative_type(value, return_type)
-    return value.to_i if return_type == Fixnum
+    return value.to_i if return_type == Integer
     return value.to_d if return_type == Float
     return parse_date(value.to_s) if return_type == Time
     return value.to_s
@@ -803,7 +824,7 @@ class Service
   # Converts an edm type (string) to a ruby type
   def edm_to_ruby_type(edm_type)
     return String if edm_type =~ /Edm.String/
-    return Fixnum if edm_type =~ /^Edm.Int/
+    return Integer if edm_type =~ /^Edm.Int/
     return Float if edm_type =~ /Edm.Decimal/
     return Time if edm_type =~ /Edm.DateTime/
     return String
