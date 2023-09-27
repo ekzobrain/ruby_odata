@@ -8,9 +8,8 @@ module OData
       @options = options.is_a?(Hash) ? options : { user: options, password: backwards_compatibility }
 
       @conn = Faraday.new(url: url, ssl: { verify: verify_ssl }) do |faraday|
-        faraday.use      :gzip
+        faraday.request  :gzip
         faraday.response :raise_error
-        faraday.adapter  :excon
 
         faraday.options.timeout      = timeout if timeout
         faraday.options.open_timeout = open_timeout if open_timeout
@@ -20,7 +19,7 @@ module OData
           :accept => '*/*; q=0.5, application/xml',
         })
 
-        faraday.basic_auth user, password if user# this adds to headers so must be behind
+        faraday.request :authorization, :basic, user, password if user# this adds to headers so must be behind
       end
 
       @conn.headers[:user_agent] = 'Ruby'

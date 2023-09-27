@@ -176,7 +176,7 @@ class Service
   # @param [Hash] additional_parameters the additional parameters
   # @param [Array] args the arguments to use for query
   def build_collection_query_object(name, additional_parameters, *args)
-    root = "/#{name.to_s}"
+    root = "/#{CGI.escape(name.to_s)}"
     if args.empty?
       #nothing to add
     elsif args.size == 1

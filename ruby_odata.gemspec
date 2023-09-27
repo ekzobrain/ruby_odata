@@ -15,14 +15,13 @@ Gem::Specification.new do |s|
 
   s.rubyforge_project = "ruby-odata"
 
-  s.required_ruby_version = '>= 1.9.3'
+  s.required_ruby_version = '>= 2.7.0'
 
   s.add_dependency("addressable", ">= 2.3.4")
   s.add_dependency("i18n", ">= 0.7.0")
   s.add_dependency("activesupport", ">= 3.0.0")
-  s.add_dependency("excon", ">= 0.45.3")
-  s.add_dependency("faraday_middleware")
-  s.add_dependency("faraday", ">= 0.9.1")
+  s.add_dependency("faraday", ">= 2.0.0")
+  s.add_dependency("faraday-gzip")
   s.add_dependency("nokogiri", ">= 1.4.2")
 
   s.add_development_dependency("rake", ">= 12.0.0")
