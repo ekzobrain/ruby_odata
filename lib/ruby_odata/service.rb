@@ -689,7 +689,6 @@ class Service
     if operation.kind == "Add"
       save_uri = "#{@uri}/#{operation.klass_name}"
       json_klass = operation.klass.to_json(:type => :add)
-
       content << "POST #{save_uri} HTTP/1.1\n"
       content << accept_headers
       content << json_klass
