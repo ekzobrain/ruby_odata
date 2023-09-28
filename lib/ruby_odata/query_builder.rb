@@ -137,7 +137,7 @@ module OData
 
     # Used to customize the properties that are returned for "ad-hoc" queries
     #
-    # @param [Array<String>] properties to return
+    # @param [Array<String>] fields to return
     #
     # @example
     #   svc.Products.select('Price', 'Rating')
@@ -171,7 +171,7 @@ module OData
       q << "/$count" if @count
       query_options = generate_query_options
 
-      q << "?#{query_options.join('&')}" if !query_options.empty?
+      q << "?#{query_options.join('&')}" unless query_options.empty?
       q
     end
 

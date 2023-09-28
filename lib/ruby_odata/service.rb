@@ -25,12 +25,11 @@ class Service
     # Queries
     if @collections.include?(name.to_s)
       @query = build_collection_query_object(name,@additional_params, *args)
-      return @query
     # Adds
     elsif name.to_s =~ /^AddTo(.*)/
       type = $1
       if @collections.include?(type)
-        @save_operations << Operation.new("Add", $1, args[0])
+        @save_operations << Operation.new("Add", type, args[0])
       else
         super
       end
@@ -108,18 +107,18 @@ class Service
   # Overridden to identify methods handled by method_missing
   def respond_to?(method)
     if @collections.include?(method.to_s)
-      return true
+      true
     # Adds
     elsif method.to_s =~ /^AddTo(.*)/
       type = $1
       if @collections.include?(type)
-        return true
+        true
       else
         super
       end
     # Function Imports
     elsif @function_imports.include?(method.to_s)
-      return true
+      true
     else
       super
     end
@@ -127,7 +126,7 @@ class Service
 
   # Retrieves the next resultset of a partial result (if any). Does not honor the `:eager_partial` option.
   def next
-    return if not partial?
+    return unless partial?
     handle_partial
   end
 
@@ -197,10 +196,6 @@ class Service
     keys = class_metadata.select{|k,h| h.is_key }
   end
 
-  # Builds the ID expression of a given id for query
-  #
-  # @param [Object] id_value the actual value to be used
-  # @param [PropertyMetadata] id_metadata the property metadata object for the id
   # Builds the IDs expression for the given ids for query
   #
   # @param [Hash] keys Hash of metadata for the keys
@@ -256,7 +251,9 @@ class Service
   end
 
   def set_namespaces
-    @edmx = Nokogiri::XML(OData::Resource.new(build_metadata_uri, @rest_options).get.body)
+    xml   = OData::Resource.new(build_metadata_uri, @rest_options).get.body
+    @edmx = Nokogiri::XML(xml)
+
     @ds_namespaces = {
       "m" => "http://schemas.microsoft.com/ado/2007/08/dataservices/metadata",
       "edmx" => "http://schemas.microsoft.com/ado/2007/06/edmx",
@@ -618,29 +615,37 @@ class Service
   end
 
   def single_save(operation)
-    if operation.kind == "Add"
+    add_headers = { content_type: @json_type }
+
+    case operation.kind
+    when 'Add'
       save_uri = build_save_uri(operation)
       json_klass = operation.klass.to_json(:type => :add)
-      post_result = OData::Resource.new(save_uri, @rest_options).post json_klass, {:content_type => @json_type}
-      return build_classes_from_result(post_result.body)
-    elsif operation.kind == "Update"
+      post_result = OData::Resource.new(save_uri, @rest_options).post json_klass, add_headers
+
+      build_classes_from_result(post_result.body)
+    when 'Update'
       update_uri = build_resource_uri(operation)
       json_klass = operation.klass.to_json
-      update_result = OData::Resource.new(update_uri, @rest_options).put json_klass, {:content_type => @json_type}
-      return (update_result.status == 204)
-    elsif operation.kind == "Delete"
+      update_result = OData::Resource.new(update_uri, @rest_options).put json_klass, add_headers
+
+      update_result.status == 204
+    when 'Delete'
       delete_uri = build_resource_uri(operation)
       delete_result = OData::Resource.new(delete_uri, @rest_options).delete
-      return (delete_result.status == 204)
-    elsif operation.kind == "AddLink"
+
+      delete_result.status == 204
+    when 'AddLink'
       save_uri = build_add_link_uri(operation)
       json_klass = operation.child_klass.to_json(:type => :link)
-      post_result = OData::Resource.new(save_uri, @rest_options).post json_klass, {:content_type => @json_type}
+      post_result = OData::Resource.new(save_uri, @rest_options).post json_klass, add_headers
 
       # Attach the child to the parent
-      link_child_to_parent(operation) if (post_result.status == 204)
+      link_child_to_parent(operation) if post_result.status == 204
 
-      return(post_result.status == 204)
+      post_result.status == 204
+    else
+      raise "Invalid operation kind #{operation.kind}"
     end
   end
 
@@ -658,7 +663,7 @@ class Service
 
     # TODO: More result validation needs to be done.
     # The result returns HTTP 202 even if there is an error in the batch
-    return (result.status == 202)
+    result.status == 202
   end
   def build_batch_body(operations, batch_num, changeset_num)
     # Header
@@ -675,7 +680,7 @@ class Service
     body << "\n\n--changeset_#{changeset_num}--\n"
     body << "--batch_#{batch_num}--"
 
-    return body
+    body
   end
   def build_batch_operation(operation, changeset_num)
     accept_headers = "Accept-Charset: utf-8\n"
@@ -714,7 +719,7 @@ class Service
       link_child_to_parent(operation)
     end
 
-    return content
+    content
   end
 
   # Complex Types
@@ -763,20 +768,11 @@ class Service
   # Field Converters
 
   # Handles parsing datetimes from a string
-  def parse_date(sdate)
+  def parse_date(date)
     # Assume this is UTC if no timezone is specified
-    sdate = sdate + "Z" unless sdate.match(/Z|([+|-]\d{2}:\d{2})$/)
+    date = "#{date}Z" unless date.match(/Z|([+|-]\d{2}:\d{2})$/)
 
-    # This is to handle older versions of Ruby (e.g. ruby 1.8.7 (2010-12-23 patchlevel 330) [i386-mingw32])
-    # See http://makandra.com/notes/1017-maximum-representable-value-for-a-ruby-time-object
-    # In recent versions of Ruby, Time has a much larger range
-    begin
-      result = Time.parse(sdate)
-    rescue ArgumentError
-      result = DateTime.parse(sdate)
-    end
-
-    return result
+    Time.parse(date)
   end
 
   # Parses a value into the proper type based on an xml property element
@@ -878,7 +874,7 @@ class Service
     end
 
     # Nothing could be parsed, so just return if we got a 200 or not
-    return (result.status == 200)
+    result.status == 200
   end
 
   # Helpers
@@ -887,4 +883,4 @@ class Service
   end
 end
 
-end # module OData
+end
