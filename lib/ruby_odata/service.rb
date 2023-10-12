@@ -8,6 +8,7 @@ class Service
   # @param [Hash] options the options to pass to the service
   # @option options [String] :username for http basic auth
   # @option options [String] :password for http basic auth
+  # @option options [String] :metadata metadata content
   # @option options [Object] :verify_ssl false if no verification, otherwise mode (OpenSSL::SSL::VERIFY_PEER is default)
   # @option options [Hash] :rest_options a hash of rest-client options that will be passed to all OData::Resource.new calls
   # @option options [Hash] :additional_params a hash of query string params that will be passed on all calls
@@ -16,6 +17,10 @@ class Service
     @uri = service_uri.gsub!(/\/?$/, '')
     set_options! options
     default_instance_vars!
+
+    xml = options[:metadata] || load_metadata
+    @edmx = Nokogiri::XML(xml)
+
     set_namespaces
     build_collections_and_classes
   end
@@ -250,10 +255,11 @@ class Service
     @next_uri = nil
   end
 
-  def set_namespaces
-    xml   = OData::Resource.new(build_metadata_uri, @rest_options).get.body
-    @edmx = Nokogiri::XML(xml)
+  def load_metadata
+    OData::Resource.new(build_metadata_uri, @rest_options).get.body
+  end
 
+  def set_namespaces
     @ds_namespaces = {
       "m" => "http://schemas.microsoft.com/ado/2007/08/dataservices/metadata",
       "edmx" => "http://schemas.microsoft.com/ado/2007/06/edmx",
